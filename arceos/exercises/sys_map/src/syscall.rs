@@ -153,8 +153,7 @@ fn sys_mmap(
         None => return -LinuxError::EINVAL.code() as _,
     };
 
-    // For this exercise, only support anonymous/private mappings.
-    // If a file descriptor is provided without MAP_ANONYMOUS, reject.
+    // 如果提供了文件描述符但没有 MAP_ANONYMOUS，则拒绝。
     if !req_flags.contains(MmapFlags::MAP_ANONYMOUS) {
         return -LinuxError::ENOSYS.code() as _;
     }
@@ -165,25 +164,25 @@ fn sys_mmap(
     let prot_flags = MmapProt::from_bits_truncate(prot);
     let mut map_flags: MappingFlags = prot_flags.into();
 
-    // Round length up to page size.
+    // 将长度向上取整到页面大小。
     let len_rounded = (length + PAGE_SIZE_4K - 1) & !(PAGE_SIZE_4K - 1);
 
-    // Decide mapping address.
+    // 决定映射地址。
     let vaddr: VirtAddr = {
-        // If MAP_FIXED, we must use the provided address.
+    // 如果包含 MAP_FIXED，则必须使用提供的地址。
         if req_flags.contains(MmapFlags::MAP_FIXED) {
             let a = VirtAddr::from(addr as usize).align_down_4k();
             a
         } else {
-            // If user provided a hint, try to use it (aligned down).
+            // 如果用户给出提示地址，尝试使用它（向下对齐）。
             let hint = addr as usize;
             if hint != 0 {
                 VirtAddr::from(hint).align_down_4k()
             } else {
-                // Choose a region below current user stack as a simple placement policy.
+                // 作为简单的放置策略，选择当前用户栈下方的一段区域。
                 let curr = current();
                 let sp = curr.task_ext().uctx.get_sp();
-                // Leave a small guard, then place the new mapping.
+                // 留出一小段保护页，然后放置新的映射。
                 let guard = PAGE_SIZE_4K;
                 let base = sp.saturating_sub(len_rounded + guard);
                 VirtAddr::from(base).align_down_4k()
@@ -191,7 +190,7 @@ fn sys_mmap(
         }
     };
 
-    // Perform the mapping in the current task's address space.
+    // 在当前任务的地址空间中执行映射。
     let aspace_arc = current().task_ext().aspace.clone();
     let mut aspace = aspace_arc.lock();
     match aspace.map_alloc(vaddr, len_rounded, map_flags, true) {

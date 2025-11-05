@@ -16,13 +16,13 @@ fn create_file(fname: &str, text: &str) -> io::Result<()> {
     file.write_all(text.as_bytes())
 }
 
-// Only support rename, NOT move.
+// 仅支持重命名，不支持移动。
 fn rename_file(src: &str, dst: &str) -> io::Result<()> {
     println!("Rename '{}' to '{}' ...", src, dst);
     match fs::rename(src, dst) {
         Ok(()) => Ok(()),
         Err(_) => {
-            // Fallback: emulate rename by copy-then-remove within same directory
+            // 退化处理：在同一目录下通过复制再删除来模拟重命名
             copy_file(src, dst)?;
             fs::remove_file(src)
         }
