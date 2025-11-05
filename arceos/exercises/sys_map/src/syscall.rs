@@ -140,7 +140,64 @@ fn sys_mmap(
     fd: i32,
     _offset: isize,
 ) -> isize {
-    unimplemented!("no sys_mmap!");
+    use axhal::mem::VirtAddr;
+    use axhal::mem::PAGE_SIZE_4K;
+    use axhal::mem::MemoryAddr; // for align_down_4k
+
+    if length == 0 {
+        return -LinuxError::EINVAL.code() as _;
+    }
+
+    let req_flags = match MmapFlags::from_bits(flags) {
+        Some(f) => f,
+        None => return -LinuxError::EINVAL.code() as _,
+    };
+
+    // For this exercise, only support anonymous/private mappings.
+    // If a file descriptor is provided without MAP_ANONYMOUS, reject.
+    if !req_flags.contains(MmapFlags::MAP_ANONYMOUS) {
+        return -LinuxError::ENOSYS.code() as _;
+    }
+    if fd != -1 {
+        return -LinuxError::EINVAL.code() as _;
+    }
+
+    let prot_flags = MmapProt::from_bits_truncate(prot);
+    let mut map_flags: MappingFlags = prot_flags.into();
+
+    // Round length up to page size.
+    let len_rounded = (length + PAGE_SIZE_4K - 1) & !(PAGE_SIZE_4K - 1);
+
+    // Decide mapping address.
+    let vaddr: VirtAddr = {
+        // If MAP_FIXED, we must use the provided address.
+        if req_flags.contains(MmapFlags::MAP_FIXED) {
+            let a = VirtAddr::from(addr as usize).align_down_4k();
+            a
+        } else {
+            // If user provided a hint, try to use it (aligned down).
+            let hint = addr as usize;
+            if hint != 0 {
+                VirtAddr::from(hint).align_down_4k()
+            } else {
+                // Choose a region below current user stack as a simple placement policy.
+                let curr = current();
+                let sp = curr.task_ext().uctx.get_sp();
+                // Leave a small guard, then place the new mapping.
+                let guard = PAGE_SIZE_4K;
+                let base = sp.saturating_sub(len_rounded + guard);
+                VirtAddr::from(base).align_down_4k()
+            }
+        }
+    };
+
+    // Perform the mapping in the current task's address space.
+    let aspace_arc = current().task_ext().aspace.clone();
+    let mut aspace = aspace_arc.lock();
+    match aspace.map_alloc(vaddr, len_rounded, map_flags, true) {
+        Ok(()) => vaddr.as_usize() as isize,
+        Err(_) => -LinuxError::ENOMEM.code() as _,
+    }
 }
 
 fn sys_openat(dfd: c_int, fname: *const c_char, flags: c_int, mode: api::ctypes::mode_t) -> isize {
