@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 
+extern crate alloc;
+
 use core::ffi::{c_void, c_char, c_int};
 use axhal::arch::TrapFrame;
-use axhal::trap::{register_trap_handler, SYSCALL};
+use axhal::trap::{register_trap_handler, SYSCALL, PAGE_FAULT};
 use axerrno::LinuxError;
 use axtask::current;
 use axtask::TaskExtRef;
@@ -174,7 +176,7 @@ fn sys_mmap(
             let a = VirtAddr::from(addr as usize).align_down_4k();
             a
         } else {
-            // 如果用户给出提示地址，尝试使用它（向下对齐）。
+            // 如果用户提供地址，尝试使用它（向下对齐）。
             let hint = addr as usize;
             if hint != 0 {
                 VirtAddr::from(hint).align_down_4k()

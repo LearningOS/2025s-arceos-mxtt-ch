@@ -14,7 +14,7 @@ make pflash_img
 make disk_img
 
 
-make A=exercises/alt_alloc/ run > $tmp_file 2>/dev/null
+make A=exercises/alt_alloc/ run | tee $tmp_file
 
 output=$(tail -n1 ./$tmp_file | grep -a "$grep_content")
 

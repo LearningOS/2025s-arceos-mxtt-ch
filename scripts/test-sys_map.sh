@@ -14,7 +14,7 @@ make disk_img
 make payload
 ./update_disk.sh payload/mapfile_c/mapfile
 
-make run A=exercises/sys_map/ BLK=y > $tmp_file 2>/dev/null
+make run A=exercises/sys_map/ BLK=y | tee $tmp_file
 
 output=$(grep -Ea "$grep_content" ./$tmp_file)
 

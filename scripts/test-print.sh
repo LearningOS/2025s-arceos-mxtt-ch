@@ -9,7 +9,7 @@ make pflash_img
 make disk_img
 
 
-make run A=exercises/print_with_color/ > a.txt 2>/dev/null
+make run A=exercises/print_with_color/ | tee a.txt
 
 context=$(tail -n 20 ./a.txt )
 
